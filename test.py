@@ -1,10 +1,12 @@
 
 import cv2 as cv
 import numpy as np
+from util import get_limits
 
+#color in bgr
 
-
-
+colour = [255,0,0]
+kernel = 100*np.ones((5,5),np.uint8)
 cap = cv.VideoCapture(0)
 
 while 1:
@@ -15,25 +17,42 @@ while 1:
     # Convert BGR to HSV
     hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
 
-    # define range of blue color in HSV
-    lower_blue = np.array([110, 100, 100])
-    upper_blue = np.array([130, 255, 255])
 
-    # Threshold the HSV image to get only blue colors
-    bluemask = cv.inRange(hsv, lower_blue, upper_blue)
-    bluemask_channels = cv.split(bluemask)
+    # define range of colour color in HSV
+    lower_colour, upper_colour = get_limits(color=colour)
 
 
-    #Correct for nonuniform illumination
-    greymask = bluemask_channels[0]
-    se = cv.getStructuringElement(cv.MORPH_RECT, (8, 8))
-    bg = cv.morphologyEx(greymask, cv.MORPH_DILATE, se)
-    out_grey = cv.divide(greymask, bg, scale=255)
-    out_binary = cv.threshold(out_grey, 0, 255, cv.THRESH_OTSU)[1]
+    # Threshold the HSV image to get only colour colors
+    colourmask = cv.inRange(hsv, lower_colour, upper_colour)
+    colour_regions = cv.bitwise_and(frame, frame, mask=colourmask)
+    colour_gray = cv.cvtColor(colour_regions, cv.COLOR_BGR2GRAY)
+
+    blur = cv.GaussianBlur(colour_gray, (5, 5), 0)
+    # otsu thresholding
+    _, binary_image = cv.threshold(blur, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+
+    kernel = cv.getStructuringElement(cv.MORPH_RECT, (3, 3))
+    closed = cv.morphologyEx(binary_image, cv.MORPH_CLOSE, kernel)
+    dilate = cv.dilate(closed, kernel, iterations=1)
 
 
     # find contours
-    contours = cv.findContours(greymask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)[-2]
+    contours, _ = cv.findContours(dilate, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+
+
+    # Check if any contours are found
+    if contours:
+
+        # Iterate through each contour to find valid
+        for contour in contours:
+            area = cv.contourArea(contour)
+            if area > 200:
+                rect = cv.minAreaRect(contour)
+                box = cv.boxPoints(rect)
+                box = np.intp(box)
+                cv.drawContours(frame, [box], 0, (0, 0, 255), 2)
+
+    '''
     for c in contours:
         # calculate moments for each contour
         M = cv.moments(c)
@@ -44,25 +63,28 @@ while 1:
             cY = int(M["m01"] / M["m00"])
         else:
             cX, cY = 0, 0
-
+    
     #for c in contours:
     #    x, y, w, h = cv.boundingRect(c)
     #    cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
     #    cv.rectangle(mask, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-
-    hull_list = []
-    for i in range(len(contours)):
-        hull = cv.convexHull(contours[i])
-        hull_list.append(hull)
-
-    for h in hull_list:
-        cv.drawContours(frame, [h], -1, (0, 255, 0), 3)
-
+    
+    
+    if contours:
+        for contour in contours:
+            # Check if the contour is valid (contains at least 3 points)
+            if len(contour) >= 3:
+                # Calculate convex hull
+                rect = cv.minAreaRect(contour)
+                box = cv.boxPoints(rect)
+                box = np.intp(box)
+                cv.drawContours(frame, [box], 0, (0, 0, 255), 2)
+    '''
 
 
     cv.imshow('frame', frame)
-    cv.imshow('mask', out_binary)
+    cv.imshow('mask', binary_image)
+    cv.imshow('mask2', dilate)
     k = cv.waitKey(5) & 0xFF
     if k == 27:
         break
