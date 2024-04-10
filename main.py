@@ -6,8 +6,14 @@ from util import get_limits
 cap = cv.VideoCapture(0)
 
 # Define the coordinates and dimensions of the rectangles
-box1 = (100, 100, 50, 50)  # Format: (x, y, width, height)
-box2 = (400, 400, 50, 50)  # Format: (x, y, width, height)
+center1 = (195, 325)
+center2 = (355, 300)
+box_width = 25
+box_height = 25
+
+# Calculate top-left corner coordinates of the boxes based on the center coordinates
+box1 = (center1[0] - box_width // 2, center1[1] - box_height // 2, box_width, box_height)
+box2 = (center2[0] - box_width // 2, center2[1] - box_height // 2, box_width, box_height)
 
 while True:
     # Take each frame
